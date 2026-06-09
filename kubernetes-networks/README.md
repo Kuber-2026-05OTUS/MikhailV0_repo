@@ -54,7 +54,7 @@
      ```
      <gateway-ip> homework.otus
      ```
-   - **Временная DNS-запись**: если в сети используется DNS-сервер (например, CoreDNS в кластере или внешний), добавьте A-запись `homework.otus → <gateway-ip>`
+   - **Временная DNS-запись**: если в сети используется DNS-сервер, добавьте A-запись `homework.otus → <gateway-ip>`
  - Проверить статус подов, сервиса, Gateway и HTTPRoute:
    ```bash
    kubectl get pods,svc,gateway,httproute -n homework
