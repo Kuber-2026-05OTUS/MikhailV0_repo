@@ -1,0 +1,16 @@
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: homework-pvc
+  namespace: homework
+  labels:
+    app: homework
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 130M
+  storageClassName: homework-sc

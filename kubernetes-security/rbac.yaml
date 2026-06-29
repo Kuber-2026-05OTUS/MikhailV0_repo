@@ -1,0 +1,53 @@
+---
+apiVersion: v1
+kind: ServiceAccount # identity для pod или внешнего клиента
+metadata:
+  name: monitoring
+  namespace: homework
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole # кластерная роль, нужна для non-resource URL /metrics
+metadata:
+  name: metrics-reader
+rules:
+  - nonResourceURLs: # права на URL Kubernetes API, а не на объект namespace
+      - /metrics
+    verbs:
+      - get
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding # привязывает ClusterRole к ServiceAccount
+metadata:
+  name: monitoring-metrics-reader
+subjects:
+  - kind: ServiceAccount
+    name: monitoring
+    namespace: homework
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: metrics-reader
+
+---
+apiVersion: v1
+kind: ServiceAccount # identity для kubeconfig cd
+metadata:
+  name: cd
+  namespace: homework
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding # выдаёт права только внутри namespace homework
+metadata:
+  name: cd-admin
+  namespace: homework
+subjects:
+  - kind: ServiceAccount
+    name: cd
+    namespace: homework
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole # можно ссылаться на встроенную ClusterRole admin
+  name: admin
