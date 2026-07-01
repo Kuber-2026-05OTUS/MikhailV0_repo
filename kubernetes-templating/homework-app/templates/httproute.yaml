@@ -1,0 +1,57 @@
+{{- if .Values.httpRoute.enabled -}}
+{{- $routeName := include "homework-app.httpRouteName" . -}}
+{{- $gatewayName := include "homework-app.gatewayName" . -}}
+{{- $svcName := include "homework-app.fullname" . -}}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $routeName }}
+  namespace: {{ include "homework-app.namespace" . }}
+  labels:
+    {{- include "homework-app.labels" . | nindent 4 }}
+  {{- with .Values.httpRoute.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  parentRefs:
+    {{- range .Values.httpRoute.parentRefs }}
+    - name: {{ default $gatewayName .name }}
+      namespace: {{ default (include "homework-app.namespace" $) .namespace }}
+      {{- with .sectionName }}
+      sectionName: {{ . }}
+      {{- end }}
+    {{- end }}
+  {{- with .Values.httpRoute.hostnames }}
+  hostnames:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    - matches:
+        - path:
+            type: Exact
+            value: {{ .Values.httpRoute.paths.conf | quote }}
+      backendRefs:
+        - name: {{ $svcName }}
+          port: {{ $.Values.service.port }}
+    - matches:
+        - path:
+            type: Exact
+            value: {{ .Values.httpRoute.paths.homepage | quote }}
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplaceFullPath
+              replaceFullPath: /index.html
+      backendRefs:
+        - name: {{ $svcName }}
+          port: {{ $.Values.service.port }}
+    - matches:
+        - path:
+            type: PathPrefix
+            value: {{ .Values.httpRoute.paths.root | quote }}
+      backendRefs:
+        - name: {{ $svcName }}
+          port: {{ $.Values.service.port }}
+{{- end }}

@@ -1,0 +1,43 @@
+image:
+  registry: docker.io
+  repository: bitnamilegacy/kafka
+  tag: latest
+
+controller:
+  replicaCount: 1
+  controllerOnly: true
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 2Gi
+  persistence:
+    size: 2Gi
+
+broker:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 2Gi
+  persistence:
+    size: 2Gi
+
+listeners:
+  client:
+    protocol: PLAINTEXT
+    sslClientAuth: ""
+  interbroker:
+    protocol: PLAINTEXT
+    sslClientAuth: ""
+  controller:
+    protocol: PLAINTEXT
+    sslClientAuth: ""
+  external:
+    protocol: PLAINTEXT
+    sslClientAuth: ""
