@@ -43,7 +43,7 @@
 ### 1. Установка приложения через Helm-чарт
 
 ```bash
-helm upgrade --install homework-app kubernetes-templating/homework-app/ --dependency-update --create-namespace
+helm upgrade --install homework-app kubernetes-templating/homework-app/ --dependency-update --create-namespace --namespace homework
 ```
 
 ### 2. Установка Kafka через Helmfile
