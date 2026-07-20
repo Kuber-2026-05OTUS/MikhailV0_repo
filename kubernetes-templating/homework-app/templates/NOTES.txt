@@ -1,0 +1,41 @@
+Homework application has been deployed.
+
+{{- if .Values.httpRoute.enabled }}
+{{- $host := first .Values.httpRoute.hostnames }}
+Application endpoints:
+  App:     http://{{ $host }}/
+  Metrics: http://{{ $host }}/metrics.html
+
+Gateway API resources:
+  Gateway:   {{ include "homework-app.gatewayName" . }}
+  HTTPRoute: {{ include "homework-app.httpRouteName" . }}
+  Namespace: {{ include "homework-app.namespace" . }}
+
+Quick access command:
+  echo "Visit http://{{ $host }}/ to use your application"
+{{- end }}
+
+Troubleshooting:
+  If the site does not open, check Gateway and HTTPRoute status.
+
+  1. Check resource YAML:
+     kubectl get gateway {{ include "homework-app.gatewayName" . }} --namespace {{ include "homework-app.namespace" . }} -o yaml
+     kubectl get httproute {{ include "homework-app.httpRouteName" . }} --namespace {{ include "homework-app.namespace" . }} -o yaml
+
+  2. Check events and conditions:
+     kubectl describe gateway {{ include "homework-app.gatewayName" . }} --namespace {{ include "homework-app.namespace" . }}
+     kubectl describe httproute {{ include "homework-app.httpRouteName" . }} --namespace {{ include "homework-app.namespace" . }}
+
+  Expected conditions:
+    - Gateway:   Accepted=True
+    - HTTPRoute: Accepted=True, ResolvedRefs=True
+
+  If Gateway listener has PortUnavailable, check that the listener port matches the Traefik entryPoint port.
+
+Inspect all namespace objects:
+  kubectl api-resources --verbs=list --namespaced -o name | grep -v -E '^events|ciliumendpoint|podmetrics|endpointslice|endpoints$' | xargs -n1 kubectl get --show-kind --ignore-not-found -n {{ include "homework-app.namespace" . }}
+
+Useful Helm commands:
+  helm dependency update homework-app
+  helm install {{ .Release.Name }} homework-app --namespace {{ include "homework-app.namespace" . }} --create-namespace
+  helm upgrade {{ .Release.Name }} homework-app --namespace {{ include "homework-app.namespace" . }} --set image.tag=1.31.1-alpine

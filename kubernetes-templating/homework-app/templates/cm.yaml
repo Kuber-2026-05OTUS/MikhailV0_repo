@@ -1,0 +1,53 @@
+{{- if .Values.configMap.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "homework-app.configMapName" . }}
+  namespace: {{ include "homework-app.namespace" . }}
+  labels:
+    {{- include "homework-app.labels" . | nindent 4 }}
+data:
+  {{ .Values.configMap.fileName }}: |
+    {{- if .Values.configMap.serverBlock }}
+    {{- .Values.configMap.serverBlock | nindent 4 }}
+    {{- else }}
+    server {
+        listen {{ .Values.container.port }};
+        root {{ include "homework-app.workDir" . }};
+        index index.html;
+
+        location /conf/ {
+            alias {{ include "homework-app.confDir" . }}/;
+            default_type {{ .Values.configMap.defaultType }};
+        }
+    }
+    {{- end }}
+{{- end }}
+---
+{{- if .Values.initContainer.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "homework-app.initScriptConfigMapName" . }}
+  namespace: {{ include "homework-app.namespace" . }}
+  labels:
+    {{- include "homework-app.labels" . | nindent 4 }}
+data:
+  {{ .Values.initContainer.scriptConfigMap.fileName }}: |
+    #!/bin/sh
+    set -eu
+
+    curl -fsSL {{ .Values.initContainer.sourceUrl | quote }} -o {{ .Values.persistence.initMountPath }}/index.html
+
+    TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+    CA_CERT=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+
+    curl \
+      --fail \
+      --silent \
+      --show-error \
+      --cacert ${CA_CERT} \
+      --header "Authorization: Bearer ${TOKEN}" \
+      https://kubernetes.default.svc/metrics \
+      -o {{ .Values.persistence.initMountPath }}/metrics.html
+{{- end }}

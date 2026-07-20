@@ -1,0 +1,175 @@
+replicaCount: 3
+
+image:
+  repository: nginx
+  tag: 1.31.1-alpine
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+labels:
+  app: homework
+  component: web
+
+container:
+  name: web-server
+  port: 8000
+  portName: http
+  protocol: TCP
+
+initContainer:
+  enabled: true
+  name: init-downloader
+  image:
+    repository: curlimages/curl
+    tag: 8.8.0
+    pullPolicy: IfNotPresent
+  scriptConfigMap:
+    name: ""
+    mountName: init-script
+    mountPath: /scripts
+    fileName: init.sh
+  sourceUrl: http://example.com
+  resources:
+    requests:
+      cpu: 100m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+serviceAccount:
+  create: false
+  automount: true
+  annotations: {}
+  name: ""
+
+rbac:
+  metricsReader:
+    enabled: true
+    serviceAccount:
+      create: true
+      automount: true
+      annotations: {}
+      name: ""
+    clusterRole:
+      name: ""
+      nonResourceURLs:
+        - /metrics
+      verbs:
+        - get
+    clusterRoleBinding:
+      name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+
+podSecurityContext: {}
+securityContext: {}
+
+nodeSelector:
+  homework: "true"
+
+tolerations: []
+affinity: {}
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+configMap:
+  enabled: true
+  name: ""
+  mountName: homework-cm
+  fileName: nginx.conf
+  defaultType: text/plain
+  serverBlock: ""
+
+persistence:
+  enabled: true
+  name: ""
+  volumeName: homework-volume
+  mountPath: /homework
+  initMountPath: /init
+  accessModes:
+    - ReadWriteOnce
+  size: 130M
+  storageClassName: homework-sc
+
+service:
+  type: ClusterIP
+  port: 8000
+  protocol: TCP
+  portName: http
+  annotations: {}
+
+gateway:
+  enabled: true
+  name: ""
+  annotations: {}
+  gatewayClassName: traefik
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 8000
+      allowedRoutes:
+        namespaces:
+          from: All
+
+httpRoute:
+  enabled: true
+  name: ""
+  annotations: {}
+  parentRefs:
+    - name: ""
+      namespace: ""
+  hostnames:
+    - homework.otus
+  paths:
+    conf: /conf/file
+    homepage: /homepage
+    root: /
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: null
+
+probes:
+  startup:
+    enabled: true
+    httpGet:
+      path: /index.html
+    initialDelaySeconds: 2
+    periodSeconds: 3
+    failureThreshold: 10
+  readiness:
+    enabled: true
+    httpGet:
+      path: /index.html
+    initialDelaySeconds: 2
+    periodSeconds: 3
+  liveness:
+    enabled: true
+    httpGet:
+      path: /index.html
+    initialDelaySeconds: 2
+    periodSeconds: 10
+
+lifecycle:
+  preStop:
+    enabled: true
+
+valkey:
+  enabled: true
+  fullnameOverride: ""
+  replicaCount: 1

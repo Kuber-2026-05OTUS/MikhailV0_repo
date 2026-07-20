@@ -1,0 +1,13 @@
+{{- if .Values.rbac.metricsReader.enabled -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "homework-app.metricsClusterRoleName" . }}
+  labels:
+    {{- include "homework-app.labels" . | nindent 4 }}
+rules:
+  - nonResourceURLs:
+      {{- toYaml .Values.rbac.metricsReader.clusterRole.nonResourceURLs | nindent 6 }}
+    verbs:
+      {{- toYaml .Values.rbac.metricsReader.clusterRole.verbs | nindent 6 }}
+{{- end }}

@@ -1,0 +1,52 @@
+image:
+  registry: docker.io
+  repository: bitnamilegacy/kafka
+  tag: 3.5.2
+
+controller:
+  replicaCount: 3
+  controllerOnly: true
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 2Gi
+  persistence:
+    size: 2Gi
+
+broker:
+  replicaCount: 3
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 2Gi
+  persistence:
+    size: 2Gi
+
+listeners:
+  client:
+    protocol: SASL_PLAINTEXT
+  interbroker:
+    protocol: SASL_PLAINTEXT
+  controller:
+    protocol: SASL_PLAINTEXT
+
+sasl:
+  enabledMechanisms: PLAIN
+  interBrokerMechanism: PLAIN
+  controllerMechanism: PLAIN
+  interbroker:
+    user: inter_broker_user
+    password: inter_broker_password
+  controller:
+    user: controller_user
+    password: controller_password
+  client:
+    users:
+      - admin
+    passwords: admin-password
