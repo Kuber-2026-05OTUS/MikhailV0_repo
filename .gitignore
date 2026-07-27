@@ -1,0 +1,65 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editors and IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Environment files and secrets
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.token
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+
+# Ansible
+.ansible/
+*.retry
+
+# Kubernetes / local tooling
+.kube/
+kubeconfig*
+token
+
+# Helm
+charts/*.tgz
+*.lock.tmp
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+
+# Docker
+.docker/
+
+# Build artifacts
+dist/
+build/
+tmp/
+temp/
