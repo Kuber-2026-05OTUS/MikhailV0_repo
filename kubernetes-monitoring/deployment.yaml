@@ -1,0 +1,53 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-stub-status
+  namespace: nginx-monitoring
+  labels:
+    app: nginx-stub-status
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-stub-status
+  template:
+    metadata:
+      labels:
+        app: nginx-stub-status
+    spec:
+      initContainers:
+        - name: nginx-exporter
+          image: harbor.mvl.test/docker/nginx/nginx-prometheus-exporter:1.1.0
+          restartPolicy: Always
+          args:
+            - -nginx.scrape-uri=http://127.0.0.1/basic_status
+          ports:
+            - name: metrics
+              containerPort: 9113
+      containers:
+        - name: nginx
+          image: harbor.mvl.test/library/nginx-custom-mon:1.0.1
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /basic_status
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /basic_status
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
