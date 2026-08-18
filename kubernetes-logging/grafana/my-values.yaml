@@ -1,0 +1,49 @@
+replicas: 1
+
+nodeSelector: &infraNodeSelector
+  node-role: infra
+
+tolerations: &infraTolerations
+  - key: node-role
+    operator: Equal
+    value: infra
+    effect: NoSchedule
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: node-role
+              operator: In
+              values:
+                - infra
+
+testFramework:
+  nodeSelector: *infraNodeSelector
+  tolerations: *infraTolerations
+
+imageRenderer:
+  nodeSelector: *infraNodeSelector
+  tolerations: *infraTolerations
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: node-role
+                operator: In
+                values:
+                  - infra
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Loki
+        type: loki
+        uid: loki
+        access: proxy
+        url: http://loki-gateway.loki.svc.cluster.local
+        isDefault: true
+        editable: true

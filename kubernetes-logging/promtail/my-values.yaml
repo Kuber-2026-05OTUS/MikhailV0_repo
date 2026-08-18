@@ -1,0 +1,15 @@
+daemonset:
+  enabled: true
+
+deployment:
+  enabled: false
+
+nodeSelector: {}
+affinity: {}
+
+tolerations:
+  - operator: Exists
+
+config:
+  clients:
+    - url: http://loki-gateway/loki/api/v1/push
