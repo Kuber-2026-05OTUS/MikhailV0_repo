@@ -1,0 +1,163 @@
+global:
+  domain: argocd.mvl.test
+  image:
+    repository: harbor.mvl.test/quay/argoproj/argocd
+  revisionHistoryLimit: 2
+  affinity:
+    podAntiAffinity: none
+
+_placement:
+  nodeSelector: &infraNodeSelector
+    node-role: infra
+  tolerations: &infraTolerations
+    - key: node-role
+      operator: Equal
+      value: infra
+      effect: NoSchedule
+
+configs:
+  cm:
+    timeout.reconciliation: 180s
+    application.resourceTrackingMethod: annotation+label
+  params:
+    server.insecure: true
+    controller.status.processors: 10
+    controller.operation.processors: 5
+    reposerver.parallelism.limit: 4
+  rbac:
+    policy.default: role:readonly
+    policy.csv: |
+      p, role:admin, applications, *, */*, allow
+      p, role:admin, clusters, *, *, allow
+      p, role:admin, repositories, *, *, allow
+      p, role:admin, projects, *, *, allow
+      p, role:admin, logs, get, */*, allow
+      g, admin, role:admin
+
+dex:
+  enabled: false
+  image:
+    repository: harbor.mvl.test/ghcr/dexidp/dex
+
+controller:
+  nodeSelector: *infraNodeSelector
+  tolerations: *infraTolerations
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+  startupProbe:
+    enabled: true
+  metrics:
+    enabled: true
+
+server:
+  nodeSelector: *infraNodeSelector
+  tolerations: *infraTolerations
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 384Mi
+  startupProbe:
+    enabled: true
+  metrics:
+    enabled: true
+  httproute:
+    enabled: true
+    parentRefs:
+      - name: traefik-gateway
+        namespace: traefik
+        sectionName: websecure
+    hostnames:
+      - argocd.mvl.test
+  extensions:
+    image:
+      repository: harbor.mvl.test/quay/argoprojlabs/argocd-extension-installer
+
+repoServer:
+  nodeSelector: *infraNodeSelector
+  tolerations: *infraTolerations
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 768Mi
+  startupProbe:
+    enabled: true
+  emptyDir:
+    sizeLimit: 1Gi
+  metrics:
+    enabled: true
+
+applicationSet:
+  nodeSelector: *infraNodeSelector
+  tolerations: *infraTolerations
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 384Mi
+  startupProbe:
+    enabled: true
+  metrics:
+    enabled: true
+
+notifications:
+  enabled: false
+  nodeSelector: *infraNodeSelector
+  tolerations: *infraTolerations
+
+redis:
+  nodeSelector: *infraNodeSelector
+  tolerations: *infraTolerations
+  image:
+    repository: harbor.mvl.test/infra/redis
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  readinessProbe:
+    enabled: true
+  livenessProbe:
+    enabled: true
+  automountServiceAccountToken: false
+  exporter:
+    image:
+      repository: harbor.mvl.test/ghcr/oliver006/redis_exporter
+
+redis-ha:
+  nodeSelector: *infraNodeSelector
+  tolerations: *infraTolerations
+  image:
+    repository: harbor.mvl.test/infra/redis
+  exporter:
+    image: harbor.mvl.test/ghcr/oliver006/redis_exporter
+  haproxy:
+    nodeSelector: *infraNodeSelector
+    tolerations: *infraTolerations
+    image:
+      repository: harbor.mvl.test/proxy-public-ecr/docker/library/haproxy
+
+redisSecretInit:
+  nodeSelector: *infraNodeSelector
+  tolerations: *infraTolerations
+  resources:
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
