@@ -1,0 +1,99 @@
+global:
+  enabled: true
+  name: consul
+  datacenter: dc1
+  logLevel: info
+
+  image: harbor.mvl.test/docker/hashicorp/consul:2.0.3
+  imageK8S: harbor.mvl.test/docker/hashicorp/consul-k8s-control-plane:2.0.3
+  imageConsulDataplane: harbor.mvl.test/docker/hashicorp/consul-dataplane:2.0.3
+  imagePullPolicy: IfNotPresent
+
+  installK8sNetworkingCRDs: false
+
+  crds:
+    enableTcpRoute: false
+    consulapi:
+      enabled: false
+
+  metrics:
+    enabled: false
+    enableAgentMetrics: false
+    enableGatewayMetrics: false
+    enableTelemetryCollector: false
+
+  acls:
+    manageSystemACLs: false
+
+server:
+  enabled: true
+  replicas: 3
+  bootstrapExpect: 3
+
+  storage: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  affinity: |
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app: {{ template "consul.name" . }}
+              release: "{{ .Release.Name }}"
+              component: server
+          topologyKey: kubernetes.io/hostname
+
+  disruptionBudget:
+    enabled: true
+    maxUnavailable: 1
+
+client:
+  enabled: false
+
+dns:
+  enabled: true
+  proxy:
+    enabled: false
+
+ui:
+  enabled: true
+  service:
+    enabled: true
+    type: ClusterIP
+
+syncCatalog:
+  enabled: false
+
+connectInject:
+  enabled: false
+
+  apiGateway:
+    manageExternalCRDs: false
+    manageNonStandardCRDs: false
+
+  sidecarProxy:
+    concurrency: 1
+
+meshGateway:
+  enabled: false
+
+ingressGateways:
+  enabled: false
+
+terminatingGateways:
+  enabled: false
+
+prometheus:
+  enabled: false
+
+telemetryCollector:
+  enabled: false
+
+tests:
+  enabled: false
