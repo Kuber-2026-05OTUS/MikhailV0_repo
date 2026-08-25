@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: otus
+  namespace: argo
+  annotations:
+    argocd.argoproj.io/project-name: Otus
+spec:
+  description: Otus project for Kubernetes GitOps homework
+  sourceRepos:
+    - https://github.com/Kuber-2026-05OTUS/MikhailV0_repo.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: "*"
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"
