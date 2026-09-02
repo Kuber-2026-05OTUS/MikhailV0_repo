@@ -1,0 +1,133 @@
+global:
+  enabled: true
+  tlsDisable: true
+
+injector:
+  enabled: true
+  replicas: 1
+  image:
+    repository: harbor.mvl.test/docker/hashicorp/vault-k8s
+    tag: "1.7.6"
+    pullPolicy: IfNotPresent
+  agentImage:
+    repository: harbor.mvl.test/docker/hashicorp/vault
+    tag: "2.0.4"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+
+server:
+  enabled: true
+  image:
+    repository: harbor.mvl.test/docker/hashicorp/vault
+    tag: "2.0.4"
+    pullPolicy: IfNotPresent
+
+  standalone:
+    enabled: false
+  ha:
+    enabled: true
+    replicas: 3
+    raft:
+      enabled: false
+    config: |-
+      ui = true
+
+      listener "tcp" {
+        tls_disable = 1
+        address = "[::]:8200"
+        cluster_address = "[::]:8201"
+      }
+
+      storage "consul" {
+        path = "vault/"
+        address = "consul-server.consul.svc.cluster.local:8500"
+      }
+
+      service_registration "kubernetes" {}
+
+  dataStorage:
+    enabled: false
+
+  auditStorage:
+    enabled: false
+
+  service:
+    enabled: true
+    type: ClusterIP
+    active:
+      enabled: true
+    standby:
+      enabled: true
+
+  httproute:
+    enabled: true
+    activeService: true
+    hostnames:
+      - vault.mvl.test
+    parentRefs:
+      - name: traefik-gateway
+        namespace: traefik
+        sectionName: web
+    matches:
+      - path:
+          type: PathPrefix
+          value: /
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  readinessProbe:
+    enabled: true
+    path: "/v1/sys/health?standbyok=true&sealedcode=204&uninitcode=204"
+    port: 8200
+
+  livenessProbe:
+    enabled: true
+    path: "/v1/sys/health?standbyok=true"
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  affinity: |
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ template "vault.name" . }}
+              app.kubernetes.io/instance: "{{ .Release.Name }}"
+              component: server
+          topologyKey: kubernetes.io/hostname
+
+ui:
+  enabled: true
+  serviceType: ClusterIP
+  activeVaultPodOnly: true
+
+csi:
+  enabled: false
+  image:
+    repository: harbor.mvl.test/docker/hashicorp/vault-csi-provider
+    tag: "1.7.4"
+    pullPolicy: IfNotPresent
+  agent:
+    image:
+      repository: harbor.mvl.test/docker/hashicorp/vault
+      tag: "2.0.4"
+      pullPolicy: IfNotPresent
+
+serverTelemetry:
+  serviceMonitor:
+    enabled: false
+  prometheusRules:
+    enabled: false
