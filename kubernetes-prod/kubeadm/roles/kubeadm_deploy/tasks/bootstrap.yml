@@ -1,0 +1,86 @@
+---
+- name: "Kubeadm deploy: Create the kubeadm configuration directory"
+  ansible.builtin.file:
+    path: /etc/kubernetes
+    state: directory
+    mode: "0755"
+  when: inventory_hostname in groups['control_plane']
+
+- name: "Kubeadm deploy: Render the init configuration"
+  ansible.builtin.template:
+    src: kubeadm-init.yml.j2
+    dest: /etc/kubernetes/kubeadm-init.yml
+    mode: "0600"
+  when: inventory_hostname in groups['control_plane'] and not kubeadm_deploy_node_joined.stat.exists
+
+- name: "Kubeadm deploy: Initialise the control plane"
+  ansible.builtin.command:
+    argv: [kubeadm, init, --config, /etc/kubernetes/kubeadm-init.yml]
+    creates: /etc/kubernetes/admin.conf
+  when: inventory_hostname in groups['control_plane']
+  no_log: true
+
+- name: "Kubeadm deploy: Install Flannel on the control plane"
+  when: inventory_hostname in groups['control_plane']
+  block:
+    - name: "Kubeadm deploy: Download the pinned Flannel manifest"
+      ansible.builtin.get_url:
+        url: "https://github.com/flannel-io/flannel/releases/download/{{ flannel_version }}/kube-flannel.yml"
+        dest: /etc/kubernetes/kube-flannel-upstream.yml
+        checksum: "{{ flannel_checksum }}"
+        mode: "0644"
+
+    - name: "Kubeadm deploy: Read the Flannel manifest"
+      ansible.builtin.slurp:
+        src: /etc/kubernetes/kube-flannel-upstream.yml
+      register: kubeadm_deploy_flannel_manifest
+
+    - name: "Kubeadm deploy: Set the Flannel Pod CIDR"
+      ansible.builtin.copy:
+        dest: /etc/kubernetes/kube-flannel.yml
+        content: >-
+          {{ (kubeadm_deploy_flannel_manifest.content | b64decode)
+             | replace('"Network": "10.244.0.0/16"', '"Network": "' ~ pod_subnet ~ '"') }}
+        mode: "0644"
+
+    - name: "Kubeadm deploy: Apply Flannel"
+      ansible.builtin.command: kubectl --kubeconfig=/etc/kubernetes/admin.conf apply -f /etc/kubernetes/kube-flannel.yml
+      register: kubeadm_deploy_flannel_apply
+      changed_when: "'created' in kubeadm_deploy_flannel_apply.stdout or 'configured' in kubeadm_deploy_flannel_apply.stdout"
+
+- name: "Kubeadm deploy: Join a new worker"
+  when: inventory_hostname in groups['workers'] and not kubeadm_deploy_node_joined.stat.exists
+  no_log: true
+  block:
+    - name: "Kubeadm deploy: Get a short-lived join command from the control plane"
+      ansible.builtin.command: kubeadm token create --ttl 15m --print-join-command
+      delegate_to: "{{ groups['control_plane'][0] }}"
+      register: kubeadm_deploy_join_command
+      changed_when: true
+
+    - name: "Kubeadm deploy: Join the worker"
+      ansible.builtin.command:
+        argv: "{{ kubeadm_deploy_join_command.stdout.split() + ['--node-name', inventory_hostname, '--cri-socket', 'unix:///run/containerd/containerd.sock'] }}"
+        creates: /etc/kubernetes/kubelet.conf
+
+- name: "Kubeadm deploy: Wait for every node to register with the configured version"
+  ansible.builtin.command: >-
+    kubectl --kubeconfig=/etc/kubernetes/admin.conf get node {{ item }}
+    -o jsonpath={.status.nodeInfo.kubeletVersion}
+  loop: "{{ groups['control_plane'] + groups['workers'] }}"
+  register: kubeadm_deploy_registered_node
+  until: kubeadm_deploy_registered_node.rc == 0 and kubeadm_deploy_registered_node.stdout == 'v' ~ kubernetes_version
+  retries: 60
+  delay: 5
+  changed_when: false
+  when: inventory_hostname in groups['control_plane']
+
+- name: "Kubeadm deploy: Wait for all nodes to become Ready"
+  ansible.builtin.command: kubectl --kubeconfig=/etc/kubernetes/admin.conf wait node --all --for=condition=Ready --timeout=300s
+  changed_when: false
+  when: inventory_hostname in groups['control_plane']
+
+- name: "Kubeadm deploy: Wait for CoreDNS"
+  ansible.builtin.command: kubectl --kubeconfig=/etc/kubernetes/admin.conf -n kube-system rollout status deployment/coredns --timeout=300s
+  changed_when: false
+  when: inventory_hostname in groups['control_plane']

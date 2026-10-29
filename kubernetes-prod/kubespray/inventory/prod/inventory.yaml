@@ -1,0 +1,40 @@
+all:
+  children:
+    kube_control_plane:
+      hosts:
+        control-01.k8s.example.test:
+          ansible_host: 198.51.100.11
+          ip: 198.51.100.11
+          etcd_member_name: etcd1
+        control-02.k8s.example.test:
+          ansible_host: 198.51.100.12
+          ip: 198.51.100.12
+          etcd_member_name: etcd2
+        control-03.k8s.example.test:
+          ansible_host: 198.51.100.13
+          ip: 198.51.100.13
+          etcd_member_name: etcd3
+    etcd:
+      children:
+        kube_control_plane: {}
+    kube_node:
+      hosts:
+        compute-01.k8s.example.test:
+          ansible_host: 198.51.100.21
+          ip: 198.51.100.21
+          node_labels:
+            node-role.kubernetes.io/worker: ""
+        compute-02.k8s.example.test:
+          ansible_host: 198.51.100.22
+          ip: 198.51.100.22
+          node_labels:
+            node-role.kubernetes.io/worker: ""
+        compute-03.k8s.example.test:
+          ansible_host: 198.51.100.23
+          ip: 198.51.100.23
+          node_labels:
+            node-role.kubernetes.io/worker: ""
+    k8s_cluster:
+      children:
+        kube_control_plane: {}
+        kube_node: {}

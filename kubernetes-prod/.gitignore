@@ -1,0 +1,6 @@
+# Local downloads, credentials and runtime artifacts, not homework evidence.
+downloads/
+runtime/
+*.local.yaml
+*.local.env
+join-command*

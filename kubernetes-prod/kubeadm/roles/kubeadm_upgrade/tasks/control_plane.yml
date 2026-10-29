@@ -1,0 +1,63 @@
+---
+- name: "Kubeadm upgrade: Update the control plane when its version differs"
+  when: current_version != kubernetes_upgrade_version or api_version != kubernetes_upgrade_version
+  block:
+    - name: "Kubeadm upgrade: Download the target repository key"
+      ansible.builtin.get_url:
+        url: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_upgrade_version.split('.')[:2] | join('.') }}/deb/Release.key"
+        dest: "/etc/apt/keyrings/kubernetes-{{ kubernetes_upgrade_version.split('.')[:2] | join('.') }}.asc"
+        mode: "0644"
+
+    - name: "Kubeadm upgrade: Switch the Kubernetes repository"
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/kubernetes.list
+        content: >-
+          deb [signed-by=/etc/apt/keyrings/kubernetes-{{ kubernetes_upgrade_version.split('.')[:2] | join('.') }}.asc]
+          https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_upgrade_version.split('.')[:2] | join('.') }}/deb/ /
+        mode: "0644"
+
+    - name: "Kubeadm upgrade: Update kubeadm"
+      ansible.builtin.apt:
+        name: "kubeadm={{ kubernetes_upgrade_version }}-*"
+        update_cache: true
+        allow_change_held_packages: true
+
+    - name: "Kubeadm upgrade: Apply the Kubernetes upgrade"
+      ansible.builtin.command: "kubeadm upgrade apply v{{ kubernetes_upgrade_version }} --yes"
+
+    - name: "Kubeadm upgrade: Drain the control plane"
+      ansible.builtin.command: "kubectl --kubeconfig=/etc/kubernetes/admin.conf drain {{ inventory_hostname }} --ignore-daemonsets --timeout=300s"
+
+    - name: "Kubeadm upgrade: Update kubelet and kubectl"
+      ansible.builtin.apt:
+        name:
+          - "kubelet={{ kubernetes_upgrade_version }}-*"
+          - "kubectl={{ kubernetes_upgrade_version }}-*"
+        allow_change_held_packages: true
+
+    - name: "Kubeadm upgrade: Hold Kubernetes packages"
+      ansible.builtin.dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop: [kubeadm, kubelet, kubectl]
+
+    - name: "Kubeadm upgrade: Restart kubelet"
+      ansible.builtin.systemd_service:
+        name: kubelet
+        state: restarted
+        daemon_reload: true
+
+    - name: "Kubeadm upgrade: Wait for the target kubelet version"
+      ansible.builtin.command: "kubectl --kubeconfig=/etc/kubernetes/admin.conf get node {{ inventory_hostname }} -o jsonpath={.status.nodeInfo.kubeletVersion}"
+      register: upgraded_node
+      until: upgraded_node.rc == 0 and upgraded_node.stdout == 'v' ~ kubernetes_upgrade_version
+      retries: 60
+      delay: 5
+      changed_when: false
+
+    - name: "Kubeadm upgrade: Wait for Ready"
+      ansible.builtin.command: "kubectl --kubeconfig=/etc/kubernetes/admin.conf wait node/{{ inventory_hostname }} --for=condition=Ready --timeout=300s"
+      changed_when: false
+
+    - name: "Kubeadm upgrade: Uncordon the control plane"
+      ansible.builtin.command: "kubectl --kubeconfig=/etc/kubernetes/admin.conf uncordon {{ inventory_hostname }}"

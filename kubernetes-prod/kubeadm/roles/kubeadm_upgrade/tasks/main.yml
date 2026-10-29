@@ -1,0 +1,63 @@
+---
+- name: "Kubeadm upgrade: Check inventory and the requested version"
+  ansible.builtin.assert:
+    that:
+      - groups['control_plane'] | length == 1
+      - groups['workers'] | length > 0
+      - ansible_play_hosts_all | sort == (groups['control_plane'] + groups['workers']) | sort
+      - kubernetes_upgrade_version is match('^1[.][0-9]+[.][0-9]+$')
+    fail_msg: Use the full inventory without --limit and a stable Kubernetes version.
+
+- name: "Kubeadm upgrade: Read the current kubelet version"
+  ansible.builtin.command: kubelet --version
+  register: kubelet_version
+  changed_when: false
+
+- name: "Kubeadm upgrade: Record the current version"
+  ansible.builtin.set_fact:
+    current_version: "{{ kubelet_version.stdout.split()[-1] | regex_replace('^v', '') }}"
+
+- name: "Kubeadm upgrade: Reject downgrade and skipped minor versions"
+  ansible.builtin.assert:
+    that:
+      - current_version is match('^1[.][0-9]+[.][0-9]+$')
+      - current_version is version(kubernetes_upgrade_version, '<=')
+      - (kubernetes_upgrade_version.split('.')[1] | int) - (current_version.split('.')[1] | int) <= 1
+    fail_msg: "Unsupported transition {{ current_version }} -> {{ kubernetes_upgrade_version }}."
+
+- name: "Kubeadm upgrade: Read the API server version"
+  ansible.builtin.command: kubectl --kubeconfig=/etc/kubernetes/admin.conf version -o json
+  register: server_version
+  changed_when: false
+  when: inventory_hostname in groups['control_plane']
+
+- name: "Kubeadm upgrade: Record the API server version"
+  ansible.builtin.set_fact:
+    api_version: "{{ (server_version.stdout | from_json).serverVersion.gitVersion | regex_replace('^v', '') }}"
+  when: inventory_hostname in groups['control_plane']
+
+- name: "Kubeadm upgrade: Check the API server upgrade direction"
+  ansible.builtin.assert:
+    that:
+      - api_version is match('^1[.][0-9]+[.][0-9]+$')
+      - api_version is version(kubernetes_upgrade_version, '<=')
+      - (kubernetes_upgrade_version.split('.')[1] | int) - (api_version.split('.')[1] | int) <= 1
+    fail_msg: "Unsupported API server transition {{ api_version }} -> {{ kubernetes_upgrade_version }}."
+  when: inventory_hostname in groups['control_plane']
+
+- name: "Kubeadm upgrade: Require Ready nodes before upgrading"
+  ansible.builtin.command: kubectl --kubeconfig=/etc/kubernetes/admin.conf wait node --all --for=condition=Ready --timeout=300s
+  changed_when: false
+  when: inventory_hostname in groups['control_plane']
+
+- name: "Kubeadm upgrade: Read existing cordon state"
+  ansible.builtin.command: kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes -o jsonpath={.items[*].spec.unschedulable}
+  register: cordoned_nodes
+  changed_when: false
+  when: inventory_hostname in groups['control_plane']
+
+- name: "Kubeadm upgrade: Do not uncordon nodes previously disabled by an operator"
+  ansible.builtin.assert:
+    that: "'true' not in cordoned_nodes.stdout"
+    fail_msg: Resolve existing cordoned nodes before starting the upgrade.
+  when: inventory_hostname in groups['control_plane']

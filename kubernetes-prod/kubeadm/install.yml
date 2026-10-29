@@ -1,0 +1,7 @@
+---
+- name: "Kubeadm deploy: Install the kubeadm cluster"
+  hosts: all
+  become: true
+  any_errors_fatal: true
+  roles:
+    - kubeadm_deploy

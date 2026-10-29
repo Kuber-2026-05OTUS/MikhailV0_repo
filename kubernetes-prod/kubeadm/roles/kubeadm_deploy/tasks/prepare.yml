@@ -1,0 +1,51 @@
+---
+- name: "Kubeadm deploy: Set the node hostname"
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}"
+
+- name: "Kubeadm deploy: Add node addresses to hosts"
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    marker: "# {mark} KUBEADM NODES"
+    block: |
+      {% for node in groups['control_plane'] + groups['workers'] %}
+      {{ hostvars[node].node_ip }} {{ node }}
+      {% endfor %}
+
+- name: "Kubeadm deploy: Read active swap"
+  ansible.builtin.command: swapon --show --noheadings
+  register: kubeadm_deploy_active_swap
+  changed_when: false
+
+- name: "Kubeadm deploy: Disable active swap"
+  ansible.builtin.command: swapoff -a
+  when: kubeadm_deploy_active_swap.stdout | length > 0
+  changed_when: true
+
+- name: "Kubeadm deploy: Disable swap in fstab"
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^(\s*)([^#\s][^\n]*\s+swap\s+[^\n]*)$'
+    replace: '\1# kubernetes: \2'
+    backup: true
+
+- name: "Kubeadm deploy: Load kernel modules"
+  ansible.builtin.command: "modprobe {{ item }}"
+  loop: [overlay, br_netfilter]
+  changed_when: false
+
+- name: "Kubeadm deploy: Persist kernel modules"
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/kubernetes.conf
+    content: "overlay\nbr_netfilter\n"
+    mode: "0644"
+
+- name: "Kubeadm deploy: Enable forwarding and bridge filtering"
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/99-kubernetes.conf
+    content: |
+      net.ipv4.ip_forward = 1
+      net.bridge.bridge-nf-call-iptables = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+    mode: "0644"
+  notify: "Kubeadm deploy: Apply sysctl"

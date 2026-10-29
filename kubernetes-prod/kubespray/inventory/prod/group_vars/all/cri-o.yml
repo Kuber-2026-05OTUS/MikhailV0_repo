@@ -1,0 +1,9 @@
+# Registries defined within cri-o.
+# crio_insecure_registries:
+#   - 192.0.2.2:5000
+
+# Auth config for the registries
+# crio_registry_auth:
+#   - registry: 192.0.2.2:5000
+#     username: user
+#     password: CHANGE_ME

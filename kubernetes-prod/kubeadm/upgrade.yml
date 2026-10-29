@@ -1,0 +1,43 @@
+---
+- name: "Kubeadm upgrade: Check the upgrade direction and cluster readiness"
+  hosts: all
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  roles:
+    - kubeadm_upgrade
+
+- name: "Kubeadm upgrade: Upgrade the control plane"
+  hosts: control_plane
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: "Kubeadm upgrade: Run control-plane tasks"
+      ansible.builtin.import_role:
+        name: kubeadm_upgrade
+        tasks_from: control_plane
+
+- name: "Kubeadm upgrade: Upgrade workers one at a time"
+  hosts: workers
+  serial: 1
+  order: sorted
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: "Kubeadm upgrade: Run worker tasks"
+      ansible.builtin.import_role:
+        name: kubeadm_upgrade
+        tasks_from: worker
+
+- name: "Kubeadm upgrade: Check the updated cluster"
+  hosts: control_plane
+  gather_facts: false
+  become: true
+  any_errors_fatal: true
+  tasks:
+    - name: "Kubeadm upgrade: Run final verification"
+      ansible.builtin.import_role:
+        name: kubeadm_upgrade
+        tasks_from: verify

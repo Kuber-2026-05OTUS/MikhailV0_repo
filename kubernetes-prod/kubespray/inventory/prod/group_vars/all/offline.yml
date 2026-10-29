@@ -1,0 +1,4 @@
+---
+## Private/offline mirror overrides removed: registry_host, debian_repo,
+## ubuntu_repo, *_url and *_image_repo overrides, and all private mirror URLs
+## have been dropped. Kubespray upstream defaults are used instead.
