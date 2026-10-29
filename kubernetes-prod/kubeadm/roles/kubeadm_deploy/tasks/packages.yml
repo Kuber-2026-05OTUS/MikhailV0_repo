@@ -1,0 +1,86 @@
+---
+- name: "Kubeadm deploy: Install repository prerequisites"
+  ansible.builtin.apt:
+    name: ca-certificates
+    update_cache: true
+
+- name: "Kubeadm deploy: Create the keyring directory"
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: "0755"
+
+- name: "Kubeadm deploy: Download the Docker repository key"
+  ansible.builtin.get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg
+    dest: /etc/apt/keyrings/docker.asc
+    mode: "0644"
+
+- name: "Kubeadm deploy: Configure the Docker repository for containerd.io"
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/docker.list
+    content: "deb [signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu noble stable\n"
+    mode: "0644"
+
+- name: "Kubeadm deploy: Download the Kubernetes repository key"
+  ansible.builtin.get_url:
+    url: "https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version.split('.')[:2] | join('.') }}/deb/Release.key"
+    dest: "/etc/apt/keyrings/kubernetes-{{ kubernetes_version.split('.')[:2] | join('.') }}.asc"
+    mode: "0644"
+
+- name: "Kubeadm deploy: Configure the Kubernetes repository"
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/kubernetes.list
+    content: >-
+      deb [signed-by=/etc/apt/keyrings/kubernetes-{{ kubernetes_version.split('.')[:2] | join('.') }}.asc]
+      https://pkgs.k8s.io/core:/stable:/v{{ kubernetes_version.split('.')[:2] | join('.') }}/deb/ /
+    mode: "0644"
+
+- name: "Kubeadm deploy: Install containerd and Kubernetes packages"
+  ansible.builtin.apt:
+    name:
+      - "containerd.io={{ containerd_version }}"
+      - "kubeadm={{ kubernetes_version }}-*"
+      - "kubelet={{ kubernetes_version }}-*"
+      - "kubectl={{ kubernetes_version }}-*"
+    update_cache: true
+    allow_change_held_packages: true
+
+- name: "Kubeadm deploy: Hold installed versions"
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: [containerd.io, kubeadm, kubelet, kubectl]
+
+- name: "Kubeadm deploy: Generate the containerd configuration"
+  ansible.builtin.command: containerd config default
+  register: kubeadm_deploy_containerd_config
+  changed_when: false
+
+- name: "Kubeadm deploy: Enable CRI and systemd cgroups"
+  ansible.builtin.copy:
+    dest: /etc/containerd/config.toml
+    content: "{{ kubeadm_deploy_containerd_config.stdout | replace('SystemdCgroup = false', 'SystemdCgroup = true') }}\n"
+    mode: "0644"
+    backup: true
+  notify: "Kubeadm deploy: Restart containerd"
+
+- name: "Kubeadm deploy: Set the kubelet node IP"
+  ansible.builtin.copy:
+    dest: /etc/default/kubelet
+    content: "KUBELET_EXTRA_ARGS=--node-ip={{ node_ip }}\n"
+    mode: "0644"
+
+- name: "Kubeadm deploy: Enable containerd"
+  ansible.builtin.systemd_service:
+    name: containerd
+    enabled: true
+    state: started
+
+- name: "Kubeadm deploy: Enable kubelet"
+  ansible.builtin.systemd_service:
+    name: kubelet
+    enabled: true
+
+- name: "Kubeadm deploy: Apply OS and runtime configuration before init or join"
+  ansible.builtin.meta: flush_handlers

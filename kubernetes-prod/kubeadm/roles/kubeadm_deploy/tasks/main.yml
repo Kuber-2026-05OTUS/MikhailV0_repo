@@ -1,0 +1,40 @@
+---
+- name: "Kubeadm deploy: Check supported OS and inventory"
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution == 'Ubuntu'
+      - ansible_facts.distribution_version == '24.04'
+      - groups['control_plane'] | length == 1
+      - groups['workers'] | length > 0
+      - ansible_play_hosts_all | sort == (groups['control_plane'] + groups['workers']) | sort
+      - kubernetes_version is match('^1[.][0-9]+[.][0-9]+$')
+    fail_msg: Use Ubuntu 24.04, one control-plane and at least one worker.
+
+- name: "Kubeadm deploy: Check whether the node already belongs to a cluster"
+  ansible.builtin.stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: kubeadm_deploy_node_joined
+
+- name: "Kubeadm deploy: Read the existing kubelet version"
+  ansible.builtin.command: kubelet --version
+  register: kubeadm_deploy_installed_kubelet
+  changed_when: false
+  when: kubeadm_deploy_node_joined.stat.exists
+
+- name: "Kubeadm deploy: Do not upgrade an existing node during installation"
+  ansible.builtin.assert:
+    that:
+      - kubeadm_deploy_installed_kubelet.stdout | trim == 'Kubernetes v' ~ kubernetes_version
+    fail_msg: Set kubernetes_upgrade_version and run upgrade.yml to change an existing cluster version.
+  when: kubeadm_deploy_node_joined.stat.exists
+
+- name: "Kubeadm deploy: Prepare the OS on a new node"
+  ansible.builtin.import_tasks: prepare.yml
+  when: not kubeadm_deploy_node_joined.stat.exists
+
+- name: "Kubeadm deploy: Install packages on a new node"
+  ansible.builtin.import_tasks: packages.yml
+  when: not kubeadm_deploy_node_joined.stat.exists
+
+- name: "Kubeadm deploy: Create the cluster"
+  ansible.builtin.import_tasks: bootstrap.yml

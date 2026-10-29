@@ -1,0 +1,20 @@
+---
+- name: "Kubeadm upgrade: Wait for all nodes to become Ready"
+  ansible.builtin.command: kubectl --kubeconfig=/etc/kubernetes/admin.conf wait node --all --for=condition=Ready --timeout=300s
+  changed_when: false
+
+- name: "Kubeadm upgrade: Read node versions"
+  ansible.builtin.command: kubectl --kubeconfig=/etc/kubernetes/admin.conf get nodes -o json
+  register: updated_nodes
+  changed_when: false
+
+- name: "Kubeadm upgrade: Check that every node has the target version"
+  ansible.builtin.assert:
+    that: item.status.nodeInfo.kubeletVersion == 'v' ~ kubernetes_upgrade_version
+  loop: "{{ (updated_nodes.stdout | from_json)['items'] }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+
+- name: "Kubeadm upgrade: Check API readiness"
+  ansible.builtin.command: kubectl --kubeconfig=/etc/kubernetes/admin.conf get --raw=/readyz
+  changed_when: false

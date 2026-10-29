@@ -1,0 +1,4 @@
+.venv/
+*.retry
+inventory/prod/artifacts/
+inventory/prod/credentials/
