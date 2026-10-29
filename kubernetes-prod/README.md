@@ -14,7 +14,7 @@
 1. Основное ДЗ: [kubeadm/README.md](kubeadm/README.md) — 1 control-plane и 3 worker.
 2. Задание со *: [kubespray/README.md](kubespray/README.md) — отдельный HA-кластер.
 
-На каждой ВМ: 2 vCPU, 8 GB RAM. IP-адреса и имена узлов в inventory приведены для примера.
+На каждой ВМ: 4 vCPU, 8 GB RAM. IP-адреса и имена узлов в inventory приведены для примера.
 
 ## Проверка
 
